@@ -26,8 +26,9 @@
 - 50-rubrics：quality-model（Q1–Q8）、definition-of-done（L0–L3）、10 份阶段清单共 228 条判据（R-）、12 个检查脚本 + `run_all_selftests.py`（全部 PASS）
 - 10-theory：14 篇理论 + README
 - 30-taste：风格卡、35 组好/坏样例对（TP-）、18 张审美判据卡（TJ-）
-- 20-craft：17 个技能（若 `ls 20-craft | wc -l` 少于 18 项（含 README），补齐缺的，格式见 CONVENTIONS §5.2）
-- 40-memory：core-memory（目标 50–60 条 MEM-）；70-playbooks/templates：14 个模板（若缺，补齐）
+- 20-craft：17 个技能 + README（已完成；SKILL.md 每个 60–95 行、行较长，如需可重排版）
+- 40-memory：60 条 MEM- 记忆条目 + README；70-playbooks：README + 14 个模板（已完成）
+- 当前 `academy_lint.py --links-as-warnings`：0 错误；严格模式下的悬空链接几乎全部指向尚未创建的 `90-curriculum/*` 与 `60-casebook/traceability.md`——完成 P5-1/P5-3 后即消失
 
 ### 3. 你要完成的剩余工作（按优先级）
 
