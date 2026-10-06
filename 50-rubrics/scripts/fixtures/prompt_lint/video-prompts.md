@@ -8,6 +8,7 @@
 ## SHOT-020
 - 时长: 8.00
 - 帧数: 192
+- 模式: Ref2VA
 - first_frame: REF-SHOT020-START
 - references: 1=CHR-SUXIAO-BOARD; 2=REF-SHOT019-START; 3=SYM-FMARK-BOARD
 - 起始帧方位: 苏晓=CENTER
@@ -40,6 +41,7 @@ No captions, subtitles, or dialogue text overlays appear at any moment.
 ## SHOT-021
 - 时长: 10.83
 - 帧数: 260
+- 模式: Ref2VA
 - first_frame: REF-SHOT021-START
 - references: 1=CHR-SUXIAO-BOARD; 2=REF-SHOT020-START
 - 起始帧方位: 苏晓=CENTER
@@ -72,6 +74,7 @@ No captions, subtitles, or dialogue text overlays appear at any moment.
 ## SHOT-022
 - 时长: 8.00
 - 帧数: 192
+- 模式: Ref2VA
 - first_frame: REF-SHOT022-START
 - references: 1=CHR-SUXIAO-BOARD
 - 起始帧方位: 苏晓=CENTER

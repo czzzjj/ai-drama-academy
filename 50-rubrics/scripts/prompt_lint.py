@@ -9,7 +9,17 @@
 溯源：D1, D2, D4, A3, A5, B2, B3, C1, P1, M3, M8, T-2（另：E1 参考编号连续、P7 分镜↔提示词时长/拍数对账）
 
 规则代码（VP-）：
-  VP-struct            error  缺 h3 块 / 六段缺失、重复或顺序错（固定顺序 = academy_common.H3_SECTIONS，T-2）/ 镜号重复
+  VP-mode              warn   缺 `- 模式: Ref2VA|FL2VA`（按 Ref2VA 检查）/ 值不认识 / FL2VA 却写了 references（API 中首尾帧与
+                              reference_* 互斥，F-H3-27）
+  VP-struct            error  缺 h3 块 / 段缺失、重复、顺序错或混用两种方言：Ref2VA = academy_common.H3_SECTIONS 六段（T-2），
+                              FL2VA = H3_SECTIONS_FL2VA 三段（integrated_multimodal_description / overall_soundscape /
+                              non_diegetic_music，F-H3-02）/ 镜号重复
+  VP-scaffold          info   Ref2VA 提示词用了首帧脚手架句（[keyframe completion] / <Picture N> is the first frame /
+                              begins in the position and framing established by）：社区实测运镜约减半（F-H3-11）
+  VP-music             warn   non_diegetic_music 段为空：没写 ≠ 静音，模型会自填通用配乐 → 无配乐写 N/A（F-ZEN-07）
+  VP-lipsync           warn   ≥2 个主体 + 有 <d> 对白，却没有写非说话人 "lips remain (completely) closed" 类句子
+                              （口型落错人：3 次中 2 次 → 加句后 3/3，F-ZEN-08）；非说话人定义为无脸/背身/出画时免（info）
+  VP-steps             warn   `- 步数:` ≤ 8：turbo/低步数压掉运镜、削弱参考与语音（F-H3-09/F-H3-10），只用于预览抽卡
   VP-ban               error  h3 块最后一个非空行 ≠ academy_common.BAN_LINE（D1 烧录字幕）
   VP-realtime          error  动作镜（分镜拍数 ≥2 或含 strike/slash/punch/kick/leap/charge/dodge/attack/block/swing/
                               fight/lunge/stab）缺 REALTIME_LINE；出现非否定的 slow motion/slowmo（A3）。
@@ -32,7 +42,7 @@
   VP-light             warn   具象光柱物件 flashlight / spotlight / light beam / god rays…（B3 二次案）
   VP-crowd             warn   人群词但全镜没有虚化描述（B2 人群被扩写）
   VP-frames            error  帧数/时长缺失；帧数不在 17k+5 网格（124–362，T-2）；时长与 帧数/24 不符
-  VP-sync              error  （给 --storyboard 时）提示词时长 ≠ 分镜时长（P7 双文档对账）
+  VP-sync              error  （给 --storyboard 时）提示词时长 ≠ 分镜时长 + 尾部余量（P7 双文档对账；`- 尾部余量:` 未写按 0）
                        warn   提示词 Beat 数 ≠ 分镜拍数；提示词中的镜在分镜表中不存在
   FMT-shot-heading     error  疑似镜头标题但不合 `## SHOT-nnn`（如 `## SHOT-3`、`### SHOT-004`）：该镜未被解析，
                               其下元数据/代码块会被并进上一镜（与 h3_frame_grid 同码）
@@ -171,6 +181,14 @@ RE_SHOTLIKE_HEADING = re.compile(r"^\s{0,3}#{1,6}\s*(?:镜头|镜号|镜)?\s*[:�
 RE_SHOT_TOKEN = re.compile(r"shot\s*[-_－—–]?\s*\d+", re.I)
 RE_STRICT_ANCHOR = re.compile(r"^##\s+ANCHOR:\s*([A-Z]{3}-[A-Z0-9-]+)\s*$")   # 与 academy_common.parse_anchors 一致
 RE_ANCHORLIKE = re.compile(r"^\s{0,3}#{1,6}\s*ANCHOR\b", re.I)
+SCAFFOLD_RE = re.compile(r"\[keyframe completion\]|<Picture \d+> is the first frame|"
+                         r"begins in the position and framing established by", re.I)
+LIPS_RE = re.compile(r"\blips?\s+(?:remain|remains|stay|stays|are|is|kept|keep)\s+(?:completely\s+|fully\s+|firmly\s+)?"
+                     r"(?:closed|shut|sealed|still)\b|\bmouth\s+(?:remains|stays|is|kept)\s+(?:completely\s+)?(?:closed|shut)\b|"
+                     r"\bdoes\s+not\s+speak\b|\bdoesn't\s+speak\b", re.I)
+NO_MOUTH_RE = re.compile(r"\bfeatureless\s+face\b|\bfaceless\b|\bno\s+(?:visible\s+)?mouth\b|\bmouthless\b|"
+                         r"\bback\s+(?:turned\s+)?to\s+(?:the\s+)?camera\b|\bseen\s+from\s+behind\b|"
+                         r"\boff[- ]screen\b|\bout\s+of\s+frame\b|\bface\s+(?:fully\s+)?(?:hidden|masked|covered)\b", re.I)
 
 
 # ------------------------------------------------------------------ 输入容错（只为不漏检/不误报）
@@ -396,10 +414,27 @@ def lint_shot(shot: dict, anchors: dict | None, sb: dict | None, sb_given: bool,
             add("warn", "VP-sync", f"分镜表中没有 {sid}（P7 双文档对账）→ 先在 storyboard.md 补这一行，或删除此镜提示词")
         else:
             pdur, sdur = ac.to_float(meta.get("时长", "")), sb.get("dur")
-            if pdur is not None and sdur is not None and abs(pdur - sdur) > 0.01:
-                add("error", "VP-sync", f"提示词 时长 {pdur:.2f}s ≠ 分镜 时长(s) {sdur:.2f}s（P7：两份文档必须逐镜一致）"
-                    f"→ 先定网格帧数，再把两边都改成同一个值（{sdur:.2f}s 吸附后为 "
-                    f"{_snap_up(sdur) or '超上限需拆段'} 帧）", pdur=pdur, sdur=sdur)
+            tail = ac.tail_margin(meta)
+            if pdur is not None and sdur is not None and abs(pdur - tail - sdur) > 0.01:
+                tl = f" + 尾部余量 {tail:.2f}s" if tail else ""
+                add("error", "VP-sync", f"提示词 时长 {pdur:.2f}s ≠ 分镜 时长(s) {sdur:.2f}s{tl}（P7：两份文档必须逐镜一致；"
+                    f"声明 尾部余量 时 提示词时长 = 分镜时长 + 余量）→ 先定网格帧数，再把两边改成一致（{sdur + tail:.2f}s 吸附后为 "
+                    f"{_snap_up(sdur + tail) or '超上限需拆段'} 帧）", pdur=pdur, sdur=sdur, tail=tail)
+
+    # ---------- VP-mode（F-H3-02/03：Ref2VA 六段，FL2VA 三段；两套检查点是不同文件）
+    mode = ac.h3_mode(meta)
+    if mode is None:
+        add("warn", "VP-mode", "缺 '- 模式: Ref2VA' 或 '- 模式: FL2VA'（format-contracts §2 必填）→ 本次按 Ref2VA 六段方言检查；"
+            "起始帧 + 角色板/前镜关键帧（P5 链式参考）= Ref2VA，只有首/尾帧 = FL2VA")
+        mode = "Ref2VA"
+    elif mode not in ("Ref2VA", "FL2VA"):
+        add("warn", "VP-mode", f"模式「{meta.get('模式')}」不认识 → 只能写 Ref2VA 或 FL2VA；本次按 Ref2VA 检查")
+        mode = "Ref2VA"
+    elif mode == "FL2VA" and ac.parse_references(meta.get("references", "")):
+        add("warn", "VP-mode", "模式=FL2VA 却写了 references：API 中首/尾帧与 reference_* 互斥（F-H3-27），多参考图 = Ref2VA → "
+            "改 模式: Ref2VA 并用六段方言，或删掉 references 只留 first_frame")
+    expected = ac.H3_SECTIONS if mode == "Ref2VA" else ac.H3_SECTIONS_FL2VA
+    other = ac.H3_SECTIONS_FL2VA if mode == "Ref2VA" else ac.H3_SECTIONS
 
     if shot["h3"] is None:
         lang = shot.get("_fence_langs") or []
@@ -414,8 +449,12 @@ def lint_shot(shot: dict, anchors: dict | None, sb: dict | None, sb_given: bool,
     masked = _mask_dialogue(h3)
 
     # ---------- VP-struct
-    order = shot["section_order"]
-    missing = [s for s in ac.H3_SECTIONS if s not in order]
+    alien = sorted({s for s in shot["section_order"] if s in other and s not in expected})
+    if alien:
+        add("error", "VP-struct", f"模式={mode}，却出现另一方言的段：{', '.join(alien)}（Ref2VA 六段 / FL2VA 三段不能混用，"
+            "F-H3-02/03）→ 按 模式 改写为 " + " → ".join(expected) + "，或改 模式", alien=alien)
+    order = [s for s in shot["section_order"] if s in expected]
+    missing = [s for s in expected if s not in order]
     dups = sorted({s for s in order if order.count(s) > 1})
     if missing:
         hint = []
@@ -433,17 +472,17 @@ def lint_shot(shot: dict, anchors: dict | None, sb: dict | None, sb_given: bool,
                 if why:
                     hint.append(f"第 {_line_of(shot, m.start())} 行「{m.group(0).strip()}」{'、'.join(why)} → 改为顶格 '{s}:'")
                     break
-        add("error", "VP-struct", f"缺少段：{', '.join(missing)}（T-2 六段方言）→ 补齐并顶格写 '段名:'"
+        add("error", "VP-struct", f"缺少段：{', '.join(missing)}（模式={mode}：{len(expected)} 段方言）→ 补齐并顶格写 '段名:'"
             + (f"；{'；'.join(hint)}" if hint else ""), missing=missing)
     if dups:
         add("error", "VP-struct", f"段重复：{', '.join(dups)} → 合并为一段", dups=dups)
     seen = list(dict.fromkeys(order))
-    expect = [s for s in ac.H3_SECTIONS if s in seen]
+    expect = [s for s in expected if s in seen]
     if seen != expect:
         k = next(i for i, (x, y) in enumerate(zip(seen, expect)) if x != y)
         add("error", "VP-struct",
-            f"六段顺序错：当前 {' → '.join(seen)}；第 {k + 1} 段应为 {expect[k]}，实为 {seen[k]} → 按 "
-            f"{' → '.join(ac.H3_SECTIONS)} 重排", order=seen)
+            f"段顺序错：当前 {' → '.join(seen)}；第 {k + 1} 段应为 {expect[k]}，实为 {seen[k]} → 按 "
+            f"{' → '.join(expected)} 重排（模式={mode}）", order=seen)
 
     # ---------- VP-ban
     nonempty = [ln for ln in h3.splitlines() if ln.strip()]
@@ -490,7 +529,7 @@ def lint_shot(shot: dict, anchors: dict | None, sb: dict | None, sb_given: bool,
     _check_pictures(shot, add)
 
     # ---------- VP-anchor / VP-symbol
-    sd = secs.get("subject_definitions", "")
+    sd = secs.get("subject_definitions" if mode == "Ref2VA" else "integrated_multimodal_description", "")
     ids = _split_ids(meta.get("锚点", ""))
     if ids and anchors is None:
         add("info", "VP-anchor", f"未提供 --anchors：跳过 {', '.join(ids)} 的锚点句逐字核对（P1）→ 加 --anchors anchors.md 重跑")
@@ -606,6 +645,42 @@ def lint_shot(shot: dict, anchors: dict | None, sb: dict | None, sb_given: bool,
             add("warn", "VP-position", f"{', '.join('[' + x + ']' for x in lacking)} 定义未用画面位置称呼（A5②：宽景中身份要靠"
                 f"画面位置，不能只靠名字）→ 按起始帧方位 {meta.get('起始帧方位')} 写成 '[S1] the … on the RIGHT: …'",
                 lacking=lacking)
+
+    # ---------- VP-scaffold（Ref2VA 用首帧脚手架句 → 运镜约减半，F-H3-11）
+    if mode == "Ref2VA":
+        for m in SCAFFOLD_RE.finditer(h3):
+            add("info", "VP-scaffold", f"Ref2VA 提示词含首帧脚手架句「{m.group(0)}」：社区同 seed A/B 实测会钉死起幅、运镜约减半（F-H3-11）"
+                "→ 如本镜需要明显运镜，改用 reference generation 表述；如本镜需要钉死构图/轴线（A5），可保留",
+                _line_of(shot, m.start()), phrase=m.group(0))
+            break
+
+    # ---------- VP-music（没写 ≠ 静音，F-ZEN-07）
+    if "non_diegetic_music" in secs:
+        mus = secs["non_diegetic_music"].replace(ac.BAN_LINE, "")
+        if not mus.strip() or re.fullmatch(r"[\s—–\-－─_]*", mus):
+            add("warn", "VP-music", "non_diegetic_music 段为空：没写 ≠ 静音，模型会自填通用配乐（F-ZEN-07：写 N/A 的 14 次无配乐，"
+                "省略的 3 次中 2 次有配乐）→ 无配乐时显式写 'N/A'")
+
+    # ---------- VP-lipsync（≥2 主体 + 对白：非说话人必须写闭嘴句，F-ZEN-08）
+    if "<d>" in h3 and (len(uniq_defs) >= 2 or len(layout) >= 2) and not LIPS_RE.search(h3):
+        speakers = {SPEAKER_RE.findall(ln[:ln.index("<d>")])[-1] for ln in h3.splitlines()
+                    if "<d>" in ln and SPEAKER_RE.findall(ln[:ln.index("<d>")])}
+        def_line = {m.group(1): ln for ln in sd.splitlines() for m in [DEF_ID_RE.match(ln)] if m}
+        silent = [x for x in uniq_defs if x not in speakers]
+        exempt = [x for x in silent if NO_MOUTH_RE.search(def_line.get(x, ""))]
+        if silent and len(exempt) == len(silent):
+            add("info", "VP-lipsync", f"非说话人 {', '.join('[' + x + ']' for x in silent)} 定义为无脸/背身/出画，口型不会落到其身上 "
+                "→ 免写闭嘴句（F-ZEN-08：背身/出画 12/12 正确）")
+        else:
+            who = ", ".join("[" + x + "]" for x in silent if x not in exempt) or "非说话人"
+            add("warn", "VP-lipsync", f"画面 ≥2 个主体且有 <d> 对白，但没有写 {who} 闭嘴（F-ZEN-08：不写时口型 3 次中 2 次落到不说话的人，"
+                f"加句后 3/3 正确）→ 在该台词同段加一句，如 '{who.split(',')[0]} does not speak; his lips remain completely closed.'")
+
+    # ---------- VP-steps（≤8 步 = turbo/预览档）
+    st = ac.to_float(meta.get("步数", ""))
+    if st is not None and st <= 8:
+        add("warn", "VP-steps", f"步数 {st:g} ≤ 8：turbo/低步数会压掉运镜、削弱参考与语音（F-H3-09：8 步语音最弱、4 步参考几乎不生效；"
+            "F-H3-10：4 步 turbo 运镜几乎全无）→ 只用于预览抽卡；定稿镜用默认 20 步（≥12）重出", steps=st)
 
     # ---------- VP-adjective
     adj: dict[str, list[int]] = {}
@@ -830,9 +905,14 @@ def analyze(prompts: str | Path, anchors_path: str | Path | None = None,
                 prev = ok.group(1)
             elif RE_ANCHORLIKE.match(unicodedata.normalize("NFKC", ln)):
                 sug = re.search(r"([A-Za-z]{3}-[A-Za-z0-9-]+)", unicodedata.normalize("NFKC", ln))
-                findings.append(Finding("error", "VP-anchor", f"锚点卡标题「{ln.strip()}」不合契约，没有被识别"
-                                        + (f"：其下的 锚点句/禁用 被并进了上一张卡 {prev}，{prev} 的逐字核对结论不可信" if prev else "")
-                                        + f" → 改为 '## ANCHOR: {sug.group(1).upper() if sug else 'XXX-ID'}'（两个 #、半角冒号、大写 ID）",
+                sid_ = sug.group(1).upper() if sug else "XXX-ID"
+                tolerated = anchors is not None and sid_ in anchors and anchors[sid_]["line"] == i
+                findings.append(Finding("warn" if tolerated else "error", "VP-anchor", f"锚点卡标题「{ln.strip()}」不合契约"
+                                        + ("（全角冒号等）：academy_common 已按容错识别为独立卡 " + sid_ + "，没有并进上一张卡"
+                                           + (f" {prev}" if prev else "") if tolerated else
+                                           "，没有被识别" + (f"：其下的 锚点句/禁用 不归属任何卡（不会再并进上一张卡 {prev}），"
+                                                           f"等于 {sid_} 没写" if prev else ""))
+                                        + f" → 改为 '## ANCHOR: {sid_}'（两个 #、半角冒号、大写 ID）",
                                         f"{Path(anchors_path).name}:{i}"))
     sb_map = {}
     if storyboard_path:
@@ -924,6 +1004,29 @@ def selftest() -> int:
           not codes("SHOT-021") and not codes("SHOT-021", "warn"), str(codes("SHOT-021") | codes("SHOT-021", "warn")))
     check("own SHOT-022: 慢动作声明 + 实时句并存 → VP-realtime warn", "VP-realtime" in codes("SHOT-022", "warn"))
     check("own SHOT-022: 帧数 192 时长 8.00 合法 → 无 VP-frames", "VP-frames" not in codes("SHOT-022"))
+
+    fl = ac.FIXTURES / "fl2va"
+    f, _ = analyze(fl / "video-prompts.md", None, fl / "storyboard.md")
+    check("fl2va: 三段方言 + 尾部余量 1.30（提示词 8.00 = 分镜 6.70 + 1.30）→ 0 error 0 warn",
+          not [x for x in f if x.level in ("error", "warn")], str([(x.code, x.msg[:60]) for x in f if x.level in ("error", "warn")]))
+    with tempfile.TemporaryDirectory() as td:
+        t = Path(td) / "vp.md"
+        g = (good / "video-prompts.md").read_text(encoding="utf-8")
+        g = (g.replace("- 模式: Ref2VA\n", "").replace("- 帧数: 260\n", "- 帧数: 260\n- 步数: 8\n")
+              .replace("featureless face with", "a stern face with")
+              .replace("  Low taiko pulse that stops one beat before the contact and hits on it.\n", "")
+              .replace("summary:\n", "summary:\n  [keyframe completion]\n"))
+        t.write_text(g, encoding="utf-8")
+        f, _ = analyze(t)
+        got = {(x.code, x.level) for x in f}
+        check("缺模式→VP-mode warn；Ref2VA 脚手架句→VP-scaffold info；空配乐→VP-music warn；双人对白无闭嘴句→VP-lipsync warn；步数 8→VP-steps warn",
+              {("VP-mode", "warn"), ("VP-scaffold", "info"), ("VP-music", "warn"), ("VP-lipsync", "warn"), ("VP-steps", "warn")} <= got,
+              str(sorted(got)))
+        t.write_text(g.replace("- 帧数: 260\n", "- 帧数: 260\n- 模式: FL2VA\n"), encoding="utf-8")
+        f, _ = analyze(t)
+        check("模式=FL2VA 却写六段 + references → VP-struct error（混用/缺段）+ VP-mode warn（互斥）",
+              any(x.code == "VP-struct" and "integrated_multimodal_description" in x.msg for x in f)
+              and any(x.code == "VP-mode" and "互斥" in x.msg for x in f))
 
     check("两位小数容差：时长 5.17s 吸附为 124 帧（不是 141）", _snap_up(5.17) == 124 and _snap_up(10.83) == 260
           and _snap_up(12.00) == 294, str((_snap_up(5.17), _snap_up(10.83), _snap_up(12.00))))
@@ -1018,8 +1121,8 @@ No captions, subtitles, or dialogue text overlays appear at any moment.
                                     "  x\ndetailed_description:\n  No jewelry at all, no armor.\noverall_soundscape:\n  x\n"
                                     "non_diegetic_music:\n  x\n" + ac.BAN_LINE + "\n```\n", encoding="utf-8")
         f, _ = analyze(tdp / "vpa.md", tdp / "an.md")
-        check("对抗：`## ANCHOR：` 全角冒号 → 报'并进了上一张卡 CHR-A'（修复前：CHR-A 被 CHR-B 的句子覆盖后假通过）",
-              any(x.code == "VP-anchor" and "并进了上一张卡 CHR-A" in x.msg for x in f))
+        check("对抗：`## ANCHOR：` 全角冒号 → common 识别为独立卡 CHR-B（不再并进 CHR-A）+ VP-anchor warn 要求改回半角",
+              any(x.code == "VP-anchor" and x.level == "warn" and "没有并进上一张卡 CHR-A" in x.msg for x in f))
         (tdp / "an.md").write_text("## ANCHOR: CHR-A\n- 锚点句 EN: ``A slender girl.``\n- 禁用: no jewelry at all, no armor\n\n"
                                    "## ANCHOR: CHR-B\n- 锚点句 EN: `a stone god`\n- 禁用: no weapon\n", encoding="utf-8")
         f, _ = analyze(tdp / "vpa.md", tdp / "an.md")

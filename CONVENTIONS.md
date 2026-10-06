@@ -258,10 +258,11 @@ F1-self-verification-loop F2-proxy-metrics        F3-patch-iteration       F4-sk
 - **分镜表**（分镜.md）：`段号 | 镜号 | 时长(s) | 拍数 | 内容 | 运镜 | 运镜因果 | 起始帧方位 | 对白 | 短镜理由`
   - `对白` 多句用 ` / ` 分隔，每句 `说话人：台词`；无对白写 `—`。
   - `起始帧方位` 写法：`神=LEFT; 苏晓=RIGHT`（画面位置大写 LEFT / RIGHT / CENTER / FG / BG）。
-  - `短镜理由`：时长 < 5s 的镜必填，否则写 `—`。
+  - `短镜理由`：时长 < 5.17s（124 帧，H3 下限）的镜必填，否则写 `—`。
 - **视频提示词**（视频提示词.md）：每镜一个二级标题 `## SHOT-012`，其下：
   - 元数据列表：`- 时长: 10.83`、`- 帧数: 260`（帧数必须落在 17k+5 网格上，124–362）、`- first_frame: REF-SHOT012-START`、`- references: 1=CHR-SUXIAO-BOARD; 2=REF-SHOT011-START`、`- 起始帧方位: 神=LEFT; 苏晓=RIGHT`、`- 轴线策略: 单轴定侧`
-  - 一个 ```` ```h3 ```` 代码块，六段各以 `段名:` 顶格起行：`subject_definitions:` / `summary:` / `retention_analysis:` / `detailed_description:` / `overall_soundscape:` / `non_diegetic_music:`；对白写作 `<d>[Chinese] 台词</d>`，由稳定说话人 ID 引出；参考图写作 `<Picture N>`。
+  - `- 模式: Ref2VA | FL2VA`（必填；见 [`00-orientation/evidence-reconciliation.md`](00-orientation/evidence-reconciliation.md) R2）。
+  - 一个 ```` ```h3 ```` 代码块。Ref2VA 用六段、FL2VA 用三段（`integrated_multimodal_description:` / `overall_soundscape:` / `non_diegetic_music:`）；Ref2VA 六段各以 `段名:` 顶格起行：`subject_definitions:` / `summary:` / `retention_analysis:` / `detailed_description:` / `overall_soundscape:` / `non_diegetic_music:`；对白写作 `<d>[Chinese] 台词</d>`，由稳定说话人 ID 引出；参考图写作 `<Picture N>`。
 - **锚点卡**（锚点卡.md）：每资产一个二级标题 `## ANCHOR: CHR-SUXIAO`，其下必须有一行 `- 锚点句 EN: \`...\``、`- 必现: …`、`- 禁用: …`、`- 来源依据: …`。
 - **剪辑单**（剪辑单.md）：`CUT | 来源 | 入点 | 出点 | 字幕 | 画面文字`，`来源`为相对路径。
 - **转写对账输入**：`SHOT-012<TAB>文本` 每行一条，或 JSON `{"SHOT-012": "文本"}`。

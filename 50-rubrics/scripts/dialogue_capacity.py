@@ -35,6 +35,9 @@
   error  D3-duration-missing  有对白但时长缺失 / 不是有限数字 / ≤0
   error  FMT-header / FMT-columns / FMT-shot-heading   分镜表头不合契约、缺 `对白` 列、提示词镜头标题不合契约（该镜未被核算）
   warn   D3-tight      利用率 > 0.85：没有呼吸余量
+  warn   D3-rushed     （规划检查）按自然语速 --natural-rate（默认 4.1 字/秒〔外部调研·F-ZEN-05〕zenstory H3 中文对白 20 次
+                       探测）算出的需求（同一公式：字数÷自然语速 + 停顿 + 换句 + 留白）> 时长：7.5 字/秒是塞得下的上限，
+                       不是好听的语速。7.5 的 error 判定不变；本项只提示"会被念得很赶"
   warn   D3-stagger    检测到一字一顿句：模型估值不确定，给出按 D3 实测（~6.5s/句）代入的上界
   warn   D3-d-stage    提示词 <d> 内含括号舞台提示：H3 可能把它念出来
   warn   FMT-d-tag / FMT-d-unclosed   `<d>` 未写 `[Chinese]` / 未闭合（已尽量计入容量）
@@ -51,7 +54,8 @@
 
 输入格式：70-playbooks/format-contracts.md
   §1 storyboard.md 的 `时长(s)` 与 `对白` 列（多句 ` / ` 分隔，每句 `说话人：台词`，无对白写 `—`）；
-  §2 video-prompts.md 每镜 `- 时长:`（缺失时退用 `- 帧数:`÷24）与 h3 代码块中的 `<d>[Chinese] 台词</d>`。
+  §2 video-prompts.md 每镜 `- 时长:`（缺失时退用 `- 帧数:`÷24）与 h3 代码块中的 `<d>[Chinese] 台词</d>`；
+     声明 `- 尾部余量: 1.3` 时，可用时长 = 时长 − 尾部余量（尾部会在剪辑中裁掉，台词必须在余量前说完；两文档时长对账也按此口径）。
   解析统一使用 academy_common（parse_storyboard / parse_video_prompts / dialogue_from_h3 / parse_dialogue / speech_chars）。
   输入容错（只为不漏检/不误报，不放宽契约，偏差一律报 FMT-* warn）：BOM；句间分隔写成无空格 `/` 或全角 `／`
   （按说话人重新切句）；无对白写成 `——` / `无对白`；`<d>[chinese]…</d>`、`<d>台词</d>`；`nan`/`inf` 时长；
@@ -64,6 +68,7 @@
   python3 dialogue_capacity.py --text "殇月：月落之时，我会回来找你 / 苏晓：我……记……住……了。" --seconds 7.5
   python3 dialogue_capacity.py --text "就是现在！"                 # 不给 --seconds：只算需求与建议帧数
   python3 dialogue_capacity.py --storyboard sb.md --margin 0.7 --pause-sec 0.8 --stagger-sec 6.0
+  python3 dialogue_capacity.py --storyboard sb.md --natural-rate 4.3          # 按本项目配音实测语速做规划检查
   python3 dialogue_capacity.py --selftest
 
 退出码：0 通过 / 1 发现问题（存在 error）/ 2 用法或环境错误。
@@ -89,6 +94,7 @@ TITLE = "对白容量核算（D3 / P9 / M5）"
 MAX_SEC = ac.frames_to_seconds(ac.H3_MAX_FRAMES)
 DISPLAY_TOL = 0.005
 D3_STAGGER_OBSERVED_SEC = 6.5   # 〔委托方实证·D3〕"一字一顿句 ~6.5s"
+NATURAL_RATE_CPS = 4.1          # 〔外部调研·F-ZEN-05〕zenstory H3 中文对白自然语速；7.5（T-2）是容量上限
 PAUSE_RE = re.compile(r"……|…|——|\.{3,}|。{3,}")
 
 RE_INLINE_SEP = re.compile(r"\s*[/／]\s*(?=[^\s：:/／][^：:/／]{0,19}[：:])")   # 无空格 / 或全角 ／ 后接「说话人：」
@@ -113,6 +119,7 @@ class Params:
     margin: float = 1.0
     warn_util: float = 0.85
     stagger_sec: float = D3_STAGGER_OBSERVED_SEC
+    natural_rate: float = NATURAL_RATE_CPS
 
 
 @dataclass
@@ -283,6 +290,23 @@ def evaluate(shot: str, where: str, dur: float | None, lines: list[str], p: Para
     if a.required > MAX_SEC + 1e-9 and not any(f.code == "D3-split" for f in fs):
         fs.append(ac.Finding("error", "D3-split", split_msg(a, p), where, data))
     return fs + stagger_fs, row
+
+
+def natural_check(where: str, dur: float | None, lines: list[str], p: Params) -> tuple[list[ac.Finding], float | None]:
+    """规划检查：按自然语速重算需求；> 时长 → warn D3-rushed。返回 (findings, 自然语速需求秒)。"""
+    if not lines:
+        return [], None
+    a = assess(lines, Params(p.natural_rate, p.pause_sec, p.gap_sec, p.margin))
+    if dur is None or not math.isfinite(dur) or dur <= 0 or a.required <= dur + 1e-9:
+        return [], a.required
+    up = snap_up(a.required)
+    fix = f"按自然语速定镜长：{up} 帧 / {sec_s(up)}s" if up else "超过 15.08s：拆镜或删句"
+    return [ac.Finding("warn", "D3-rushed",
+                       f"按自然语速需 {a.required:.2f}s（{breakdown(a, Params(p.natural_rate, p.pause_sec, p.gap_sec, p.margin))}）"
+                       f"> 时长 {dur:.2f}s；7.5 字/秒是塞得下的上限，不是好听的语速（自然语速 {p.natural_rate:g} 字/秒为外部实测"
+                       f"〔外部调研·F-ZEN-05〕，待本管线复测）→ {fix}，或删减台词", where,
+                       {"natural_rate": p.natural_rate, "natural_required": round(a.required, 3), "duration": dur,
+                        "natural_recommended_frames": up})], a.required
 
 
 # ------------------------------------------------------------------ 输入容错（只为不漏检/不误报）
@@ -540,6 +564,9 @@ def load_prompts(path: Path) -> tuple[list[dict], list[ac.Finding]]:
             m = re.fullmatch(r"(\d+)\s*(?:帧|f|frames)?", fr, re.I)
             if m and int(m.group(1)) > 0:
                 dur = ac.frames_to_seconds(int(m.group(1)))
+        tail = ac.tail_margin(s["meta"])
+        if dur is not None and tail and dur - tail > 0:
+            dur -= tail          # 尾部余量会在剪辑中裁掉：可用时长 = 时长 − 余量（与分镜时长同口径）
         lines, bad, unclosed, staged = prompt_lines(s["h3"]) if s["h3"] is not None else ([], [], 0, [])
         if bad:
             fs.append(ac.Finding("warn", "FMT-d-tag",
@@ -591,7 +618,9 @@ def analyze_docs(sb: list[dict] | None, vp: list[dict] | None, p: Params) -> tup
             silent.append(label)
             continue
         f, row = evaluate(u["shot"], u["where"], u["dur"], u["lines"], p, u["src"])
-        fs += f
+        nf, nreq = natural_check(u["where"], u["dur"], u["lines"], p)
+        row["natural_required"] = round(nreq, 3) if nreq is not None else None
+        fs += f + nf
         rows.append(row)
 
     if both:
@@ -742,6 +771,14 @@ def selftest() -> int:
     fe, _ = evaluate("E", "en", 3.0, ["Run, you fool, run now before it is too late!"], p, "synthetic")
     check([f.code for f in fe] == ["D3-margin"] and fe[0].data["chars"] == 20,
           "纯英文台词 10 词 → 按 20 字计 2.67s，3s 装得下但留白不足 → D3-margin")
+
+    nf, _ = natural_check("rushed", 5.88, [tight], p)
+    check([f.code for f in nf] == ["D3-rushed"] and "不是好听的语速" in nf[0].msg,
+          "31 字 / 5.88s：7.5 字/秒只到 D3-tight，按自然语速 4.1 字/秒需 8.56s → D3-rushed warn")
+    fl = ac.FIXTURES / "fl2va"
+    ffs, _ = run_docs(fl / "storyboard.md", fl / "video-prompts.md")
+    check(not codes(ffs, "error") and not codes(ffs, "warn"),
+          "fixtures/fl2va：提示词 8.00s 声明尾部余量 1.30 → 按 6.70s 与分镜对账，0 warn（不报 P7-duration-diff）")
 
     # 5. 合成：提示词有、分镜无；时长不一致
     HDR = ("| 段号 | 镜号 | 时长(s) | 拍数 | 内容 | 运镜 | 运镜因果 | 起始帧方位 | 对白 | 短镜理由 |\n"
@@ -901,17 +938,19 @@ def main(argv: list[str] | None = None) -> int:
     ap.add_argument("--warn-util", type=float, default=0.85, help="利用率警告阈值（默认 0.85）")
     ap.add_argument("--stagger-sec", type=float, default=D3_STAGGER_OBSERVED_SEC,
                     help="一字一顿句实测时长上界，用于建议值（默认 6.5，D3 实证）")
+    ap.add_argument("--natural-rate", type=float, default=NATURAL_RATE_CPS,
+                    help="规划检查用的自然语速 字/秒（默认 4.1，外部调研 F-ZEN-05；7.5 是容量上限）→ 超出报 warn D3-rushed")
     ap.add_argument("--json", action="store_true", help="输出机器可读 JSON")
     ap.add_argument("--selftest", action="store_true", help="运行自测（fixtures + D3 实证复现 + 对抗样例），全部通过退出 0")
     a = ap.parse_args(argv)
 
     if a.selftest:
         return selftest()
-    nums = [a.rate, a.pause_sec, a.gap_sec, a.margin, a.warn_util, a.stagger_sec]
-    if (not all(math.isfinite(x) for x in nums) or a.rate <= 0 or a.pause_sec < 0 or a.gap_sec < 0 or a.margin < 0
+    nums = [a.rate, a.pause_sec, a.gap_sec, a.margin, a.warn_util, a.stagger_sec, a.natural_rate]
+    if (not all(math.isfinite(x) for x in nums) or a.rate <= 0 or a.natural_rate <= 0 or a.pause_sec < 0 or a.gap_sec < 0 or a.margin < 0
             or a.stagger_sec < 0 or not (0 < a.warn_util <= 1.5)):
         ac.die("参数越界：全部为有限数字；--rate > 0，--pause-sec/--gap-sec/--margin/--stagger-sec ≥ 0，0 < --warn-util ≤ 1.5")
-    p = Params(a.rate, a.pause_sec, a.gap_sec, a.margin, a.warn_util, a.stagger_sec)
+    p = Params(a.rate, a.pause_sec, a.gap_sec, a.margin, a.warn_util, a.stagger_sec, a.natural_rate)
     if a.seconds is not None and a.text is None:
         ac.die("--seconds 只能与 --text 一起用（文档模式的时长取自文档）")
     if a.text is None and not a.storyboard and not a.prompts:
@@ -937,7 +976,9 @@ def main(argv: list[str] | None = None) -> int:
                                 "--text", row))
             if row["model_recommended_frames"] is None and not any(x.code == "D3-split" for x in f):
                 f.append(ac.Finding("error", "D3-split", split_msg(assess(lines, p), p), "--text", row))
-        findings += f
+        nf, nreq = natural_check("--text", a.seconds, lines, p)
+        row["natural_required"] = round(nreq, 3) if nreq is not None else None
+        findings += f + nf
         rows.append(row)
 
     sb = vp = None

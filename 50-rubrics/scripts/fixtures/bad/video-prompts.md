@@ -3,6 +3,7 @@
 ## SHOT-003
 - 时长: 12.00
 - 帧数: 290
+- 模式: Ref2VA
 - first_frame: REF-SHOT003-START
 - references: 2=CHR-SUXIAO-BOARD; 3=CHR-STONEGOD-BOARD
 - 起始帧方位: 石神=LEFT; 苏晓=RIGHT
