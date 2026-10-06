@@ -1,0 +1,16 @@
+{
+  "SHOT-010": [
+    {"order": 1, "ref": "REF-SHOT010-START", "placeholder": true},
+    {"order": 2, "ref": "CHR-SUXIAO-BOARD"},
+    {"order": 3, "ref": "CHR-STONEGOD-BOARD"}
+  ],
+  "SHOT-011": [
+    {"order": 1, "ref": "CHR-SUXIAO-BOARD"},
+    {"order": 2, "ref": "CHR-STONEGOD-BOARD"},
+    {"order": 3, "ref": "REF-SHOT011-START", "placeholder": true}
+  ],
+  "SHOT-012": [
+    {"order": 1, "ref": "CHR-SUXIAO-BOARD"},
+    {"order": 3, "ref": "REF-SHOT011-START"}
+  ]
+}
