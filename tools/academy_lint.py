@@ -313,6 +313,8 @@ def check_refs_and_links(rep: Report, defs: dict):
         raw = f.read_text(encoding="utf-8")
         text = strip_code(raw)
         is_catalog = "80-sources/catalog" in rel(f)
+        if "50-rubrics/scripts/fixtures/" in rel(f):  # 脚本 fixtures 故意含坏链接/坏编号，是测试数据
+            continue
         if rel(f) in EXAMPLE_DOCS:  # 公约/契约文档中的编号是格式示例，不做引用校验
             continue
         for i, ln in enumerate(text.splitlines(), 1):
