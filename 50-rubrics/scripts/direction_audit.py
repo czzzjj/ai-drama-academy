@@ -621,7 +621,7 @@ def analyze(prompts: str | Path, storyboard: str | Path | None = None) -> tuple[
     pname = Path(prompts).name
     bad_heads = _bad_headings(ptext)
     for ln, raw, sug, prev, swallowed in bad_heads:
-        spill = f"；其下的元数据/代码块会被算到上一镜 {prev} 头上，{prev} 的审计结论在改正前不可信" if prev else ""
+        spill = f"；其下的元数据/代码块不归属任何镜（academy_common 遇到任何标题即结束上一镜，不会再并进上一镜 {prev}）" if prev else ""
         msg = (f"镜头标题「{raw}」落在代码块里（上一个 ``` 没闭合，或外层套了 ````）：这一镜完全没被解析" + (f"，被吞进了 {prev} 的代码块，{prev} 的结论也不可信" if prev else "") + " → 在上一镜禁令句后补一行 ``` 闭合代码块（或去掉外层围栏）后重跑" if swallowed else
                f"标题「{raw}」没有被识别为镜头（契约：`## SHOT-nnn`），这一镜的方位词完全没被审计{spill} → 改为 `## {sug}` 后重跑")
         findings.append(Finding("error", "FMT-shot-heading", msg, f"{pname}:{ln}",

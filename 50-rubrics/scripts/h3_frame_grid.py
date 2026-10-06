@@ -81,7 +81,7 @@ RE_META_LIKE = re.compile(r"^\s*[-*+]\s*[*_`]*\s*(帧数|时长)\s*[*_`]*\s*[:�
 
 def snap_up(sec: float) -> int | None:
     """≥ sec 的最小合法帧数（容忍两位小数显示舍入；超过 362 帧返回 None）。"""
-    return ac.snap_seconds_up(sec - DISPLAY_TOL)
+    return ac.snap_seconds_up(sec)        # academy_common 已内置 0.005s 显示容差
 
 
 def k_of(n: int) -> int:
@@ -306,7 +306,7 @@ def check_prompts(path: str | Path, tol: float = 0.05) -> list[ac.Finding]:
         fs.append(bom_finding(path))
     bad_heads = scan_bad_headings(text)
     for ln, raw, sug, prev in bad_heads:
-        spill = (f"；其下的元数据/代码块会被算到上一镜 {prev} 头上，{prev} 的结论在改正前不可信" if prev else "")
+        spill = (f"；其下的元数据/代码块不归属任何镜（academy_common 遇到任何标题即结束上一镜，不会再算到上一镜 {prev} 头上）" if prev else "")
         fs.append(ac.Finding("error", "FMT-shot-heading",
                              f"标题「{raw}」没有被识别为镜头（契约：`## SHOT-nnn`——两个 #、大写 SHOT、三位数字），"
                              f"这一镜的帧数/时长未被任何脚本校验{spill}。改为 `## {sug}` 后重跑",
@@ -550,8 +550,9 @@ def selftest() -> int:
         p = doc("absorb.md", "## SHOT-001\n- 时长: 10.83\n- 帧数: 260\n\n## SHOT-2\n- 时长: 12.00\n- 帧数: 290\n")
         fs = check_prompts(p)
         hd = next((f for f in fs if f.code == "FMT-shot-heading"), None)
-        check(hd is not None and hd.data["absorbed_by"] == "SHOT-001" and "SHOT-001 头上" in hd.msg,
-              "坏标题下的元数据被并进上一镜（SHOT-001 被误报离网格）→ FMT-shot-heading 明确指出 SHOT-001 结论不可信")
+        check(hd is not None and hd.data["absorbed_by"] == "SHOT-001" and "SHOT-001 头上" in hd.msg
+              and ("T2-ok", "SHOT-001") in {(f.code, f.where.split(' · ')[0]) for f in fs},
+              "坏标题 `## SHOT-2` → FMT-shot-heading；其下元数据不再并进上一镜（SHOT-001 照常通过，不被误报离网格）")
 
         # 8. 对抗：键名/值的非契约写法 → 按值校验 + warn（修复前：误报缺失 / NaN 被当成通过）
         p = doc("values.md", "\n".join([

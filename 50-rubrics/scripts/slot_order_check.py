@@ -352,7 +352,7 @@ def analyze(prompts: str | Path | None = None, bindings: str | Path | None = Non
         for ln, raw, sug, prev, swallowed in bad_heads:
             msg = (f"镜头标题「{raw}」落在代码块里（上一个 ``` 没闭合，或外层套了 ````）：这一镜完全没被解析" + (f"，被吞进了 {prev} 的代码块，{prev} 的结论也不可信" if prev else "") + " → 在上一镜禁令句后补一行 ``` 闭合代码块（或去掉外层围栏）后重跑" if swallowed else
                    f"标题「{raw}」没有被识别为镜头（契约：`## SHOT-nnn`），这一镜的 references 完全没被检查"
-                   + (f"，其元数据可能被并进上一镜 {prev}" if prev else "") + f" → 改为 `## {sug}` 后重跑")
+                   + (f"（其元数据不归属任何镜，不会再并进上一镜 {prev}）" if prev else "") + f" → 改为 `## {sug}` 后重跑")
             findings.append(Finding("error", "FMT-shot-heading", msg, f"{pname}:{ln}",
                                     {"heading": raw, "suggest": sug, "in_code": swallowed}))
         if not lst and not bad_heads:

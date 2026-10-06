@@ -131,7 +131,7 @@ class Assessment:
 # ------------------------------------------------------------------ 模型
 
 def snap_up(sec: float) -> int | None:
-    return ac.snap_seconds_up(sec - DISPLAY_TOL)
+    return ac.snap_seconds_up(sec)        # academy_common 已内置 0.005s 显示容差
 
 
 def sec_s(n: int) -> str:
@@ -406,7 +406,7 @@ def prompt_lines(h3: str) -> tuple[list[str], list[str], int, list[str]]:
     """返回 (台词, 不合契约的 <d> 原文, 未闭合 <d> 数, 含括号舞台提示的台词)。合契约的 <d> 由 academy_common 解析。"""
     strict = ac.dialogue_from_h3(h3)
     found = list(RE_D_ANY.finditer(h3))
-    bad = [m.group(0) for m in found if not ac.RE_DIALOGUE.fullmatch(m.group(0))]
+    bad = [i["text"] for i in ac.dialogue_tag_issues(h3) if i["kind"] in ("no-lang", "lang-case", "lang-bracket")]
     raw = strict if not bad else [RE_LANG_TAG.sub("", m.group(1)).strip() for m in found]
     unclosed = max(0, len(RE_D_OPEN.findall(h3)) - len(found))
     lines, staged = [], []
@@ -504,6 +504,7 @@ def load_storyboard(path: Path) -> tuple[list[dict], list[ac.Finding]]:
                                  f"时长(s) 写成 '{raw.get('时长(s)')}'，已按 {dur:g} 核算；契约要求纯数字（{dur:g}），否则其他脚本读不到",
                                  where))
         lines, resplit, staged = clean_pairs(s["dialogue"])
+        resplit = resplit or bool(ac.dialogue_sep_issues(s.get("dialogue_raw", "")))   # academy_common 已切句，偏差照报
         if resplit:
             fs.append(ac.Finding("warn", "FMT-dialogue-sep",
                                  f"对白多句没有用 ` / `（半角斜杠、两侧空格）分隔：已按说话人切成 {len(lines)} 句核算；"
@@ -518,7 +519,7 @@ def load_prompts(path: Path) -> tuple[list[dict], list[ac.Finding]]:
     fs: list[ac.Finding] = [bom_finding(path)] if had_bom else []
     bad_heads = scan_bad_headings(text)
     for ln, raw, sug, prev in bad_heads:
-        spill = (f"；其下的 <d> 台词会被算到上一镜 {prev} 头上，{prev} 的结论在改正前不可信" if prev else "")
+        spill = (f"；其下的 <d> 台词不归属任何镜（academy_common 遇到任何标题即结束上一镜，不会再算到上一镜 {prev} 头上）" if prev else "")
         fs.append(ac.Finding("error", "FMT-shot-heading",
                              f"标题「{raw}」没有被识别为镜头（契约：`## SHOT-nnn`），这一镜的 <d> 台词未被核算/对账{spill}。"
                              f"改为 `## {sug}` 后重跑", f"{path.name}:{ln}", {"suggest": sug, "absorbed_by": prev}))

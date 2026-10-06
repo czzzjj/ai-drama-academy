@@ -83,7 +83,7 @@ class Params:
 
 
 def snap_up(sec: float) -> int | None:
-    return ac.snap_seconds_up(sec - DISPLAY_TOL)
+    return ac.snap_seconds_up(sec)        # academy_common 已内置 0.005s 显示容差
 
 
 def sec_s(n: int) -> str:

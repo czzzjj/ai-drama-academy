@@ -345,10 +345,13 @@ def prompt_dialogue(shot: dict) -> list[tuple[str | None, str | None, str]]:
     texts = ac.dialogue_from_h3(shot.get("h3") or "")
     per_line = []
     for ln in (shot.get("h3") or "").splitlines():
-        for m in LINE_D_RE.finditer(ln):
+        for m in re.finditer(r"<d>(.*?)</d>", ln):           # 与 academy_common.dialogue_from_h3 同口径
+            t = ac.dialogue_text(m.group(1))
+            if t is None:
+                continue
             ids = SPK_RE.findall(ln[:m.start()])
             sid = ids[-1] if ids else None
-            per_line.append((sid, mapping.get(sid or ""), m.group(1).strip()))
+            per_line.append((sid, mapping.get(sid or ""), t))
     if len(per_line) == len(texts):
         return per_line
     return [(None, None, t) for t in texts]
@@ -410,6 +413,7 @@ def analyze(storyboard: str | Path | None = None, prompts: str | Path | None = N
         script = sb[shot]["dialogue"] if shot in sb else None
         if script:
             script, resplit = split_script(script)
+            resplit = resplit or bool(ac.dialogue_sep_issues(sb[shot].get("dialogue_raw", "")))   # common 已切句，偏差照报
             if resplit:
                 add("warn", "TR-format", "分镜 对白 列的句间分隔写成了无空格的 / 或全角 ／（已按 '说话人：台词' 重新拆句再对账）→ 改为"
                     " ' / '（两侧各一个空格），否则其他脚本会把下一句的说话人名当成台词")

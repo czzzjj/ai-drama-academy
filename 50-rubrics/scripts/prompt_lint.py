@@ -326,7 +326,7 @@ def _where(shot: dict, line: int | None = None) -> str:
 def _snap_up(sec: float) -> int | None:
     """ac.snap_seconds_up 的两位小数容差版：契约把时长写成两位小数（124 帧 = 5.1667s 写作 5.17），
     直接吸附会把 5.17 吸到 141 帧；这里先减去 0.005s 的舍入误差。"""
-    return ac.snap_seconds_up(max(0.0, sec - 0.005))
+    return ac.snap_seconds_up(max(0.0, sec))    # academy_common 已内置 0.005s 显示容差
 
 
 def _ws(s: str) -> str:
@@ -798,7 +798,7 @@ def analyze(prompts: str | Path, anchors_path: str | Path | None = None,
     pname = Path(prompts).name
     bad_heads = _bad_headings(ptext)
     for ln, raw, sug, prev, swallowed in bad_heads:
-        spill = f"；其下的元数据/代码块会被算到上一镜 {prev} 头上，{prev} 的检查结论在改正前不可信" if prev else ""
+        spill = f"；其下的元数据/代码块不归属任何镜（academy_common 遇到任何标题即结束上一镜，不会再并进上一镜 {prev}）" if prev else ""
         msg = (f"镜头标题「{raw}」落在代码块里（上一个 ``` 没闭合，或外层套了 ````）：这一镜完全没被解析" + (f"，被吞进了 {prev} 的代码块，{prev} 的结论也不可信" if prev else "") + " → 在上一镜禁令句后补一行 ``` 闭合代码块（或去掉外层围栏）后重跑" if swallowed else
                f"标题「{raw}」没有被识别为镜头（契约：`## SHOT-nnn`——两个 #、大写 SHOT、三位数字），这一镜完全没被检查{spill}"
                f" → 改为 `## {sug}` 后重跑")
