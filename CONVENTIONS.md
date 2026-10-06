@@ -61,6 +61,7 @@ CLAUDE.md / AGENTS.md          维护者入口（指向本公约）
   eight-questions.md           G1–G8 逐条回答 + 回答模块映射
   production-lifecycle.md      开发→预制作→制作→后期→审片 的工业流程与各阶段闸门（回答 G7）
   glossary.md                  术语表（段/拍/镜/起始帧/锚点句…；澄清 G6 的"运镜""打斗逻辑"歧义）
+  evidence-reconciliation.md   证据冲突裁决（委托方实证 vs 官方文档 vs 社区实测）、新增根因、画幅规格、合规许可
 10-theory/
   README.md
   01-vertical-drama-physiology.md   02-film-language-for-generators.md
