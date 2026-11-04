@@ -86,3 +86,18 @@ bash ~/ai-drama-academy/90-curriculum/install/install.sh   # 技能→技能目�
 python3 tools/academy_lint.py                       # 格式、编号、追溯、链接
 python3 50-rubrics/scripts/run_all_selftests.py     # 全部检查脚本自测
 ```
+
+## 许可
+
+| 范围 | 许可 | 全文 |
+|---|---|---|
+| 文档（`*.md`：课程、理论、案例、判据、记忆、playbook） | [CC BY 4.0](https://creativecommons.org/licenses/by/4.0/) | [`LICENSE`](LICENSE) |
+| 脚本与工具（`*.py`、`*.sh`） | [MIT](https://opensource.org/license/mit) | [`LICENSE-MIT`](LICENSE-MIT) |
+
+转载或再分发请保留署名：`AI-Drama-Academy — github.com/czzzjj/ai-drama-academy`。
+
+## 第三方内容与引用声明
+
+- 本仓库**不包含**任何原著的正文、插图或音视频素材。案例卡里出现的角色名（如「苏晓」「尼加狄」）仅用于指认具体的生产缺陷与验收判据，属评论与教学性质的引用，相关权利归原作者及权利人所有。
+- [`80-sources/`](80-sources/) 下是外部公开资料的摘要与出处索引，每条附 URL 供回源核对；引用范围以说明观点为限。
+- 文中提到的 Qwen-Image、MiniMax H3、ComfyUI、Runway、Seedance 等产品与模型，名称与许可归各自权利人所有；本仓库不分发任何模型权重、素材或生成产物。
