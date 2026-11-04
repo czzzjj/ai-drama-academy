@@ -92,10 +92,12 @@ class Report:
 
 
 def rel(p: Path) -> str:
+    # 统一用正斜杠：路径判断（fixtures 排除、catalog 特例）按 "/" 书写，
+    # 直接用 str() 在 Windows 上得到反斜杠，会让这些判断静默失效。
     try:
-        return str(p.resolve().relative_to(ROOT))
+        return p.resolve().relative_to(ROOT).as_posix()
     except ValueError:
-        return str(p)
+        return p.as_posix()
 
 
 def md_files() -> list[Path]:
